@@ -1,102 +1,76 @@
+# As of 10.12.24
 import os
 import shutil
+
+# Function to create a folder
+
 
 def create_folder(directory):
     folder_name = "NewFolder"
     folder_path = os.path.join(directory, folder_name)
-    os.makedirs(folder_path, exist_ok=True)  # Creates the folder if it doesn't exist
+    # Creates the folder if it doesn't exist
+    os.makedirs(folder_path, exist_ok=True)
     return folder_path
 
-def create_file(directory):
-    file_name = "example.txt"
-    file_path = os.path.join(directory, file_name)
+# Function to create a file with dynamic name and extension
+
+
+def create_file(directory, file_name="example", file_extension=".txt"):
+    file_path = os.path.join(directory, f"{file_name}{file_extension}")
     with open(file_path, 'w') as f:
-        f.write("This is an example file created inside the new folder.")
+        f.write(f"This is an example {
+                file_extension} file created inside the new folder.")
     return file_path
 
+# Function to copy a file from source to destination
+
+
 def copy_file(src, dst):
-    shutil.copy(src, dst)
+    try:
+        shutil.copy(src, dst)  # Copies the file
+        print(f"File copied from {src} to {dst}")
+    except Exception as e:
+        print(f"Error copying file: {e}")
 
-def delete_file(file_path):
-    if os.path.exists(file_path):
-        os.remove(file_path)
+        import shutil  # Required for moving files
 
-def rename_file(old_name, new_name):
-    os.rename(old_name, new_name)
 
 def move_file(src, dst):
-    import shutil
-    shutil.move(src, dst)
+    try:
+        shutil.move(src, dst)  # Moves the file from src to dst
+    except Exception as e:
+        print(f"Error moving file: {e}")
+        raise
 
-def make_folder(folder_path):
-    os.makedirs(folder_path, exist_ok=True)
-
-def remove_folder(folder_path):
-    import shutil
-    shutil.rmtree(folder_path)
 
 def list_files(directory):
-    return os.listdir(directory)
+    try:
+        # List only files (not directories) in the given directory
+        return [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
+    except Exception as e:
+        print(f"Error listing files: {e}")
+        raise
 
-# Advanced file operations:
-class FileManager:
-    def __init__(self, directory):
-        self.directory = directory
-        self.file_tags = {}
+# Main function to interact with the user
 
-    def search_by_attributes(self, file_type=None, min_size=None, max_size=None,
-                             created_after=None, modified_after=None):
-        results = []
-        for dirpath, dirnames, filenames in os.walk(self.directory):
-            for filename in filenames:
-                file_path = os.path.join(dirpath, filename)
-                file_info = os.stat(file_path)
-                file_size = file_info.st_size
-                creation_time = time.ctime(file_info.st_ctime)
-                modification_time = time.ctime(file_info.st_mtime)
-                
-                # Check file type
-                if file_type and not fnmatch.fnmatch(filename, f'*.{file_type}'):
-                    continue
-                # Check file size
-                if (min_size and file_size < min_size) or (max_size and file_size > max_size):
-                    continue
-                # Check creation date
-                if created_after and time.mktime(time.strptime(creation_time)) < created_after:
-                    continue
-                # Check modification date
-                if modified_after and time.mktime(time.strptime(modification_time)) < modified_after:
-                    continue
-                
-                results.append({
-                    'path': file_path,
-                    'size': file_size,
-                    'created': creation_time,
-                    'modified': modification_time
-                })
-        return results
 
-    def search_within_files(self, search_text):
-        results = []
-        for dirpath, dirnames, filenames in os.walk(self.directory):
-            for filename in filenames:
-                file_path = os.path.join(dirpath, filename)
-                if filename.endswith(('.txt', '.csv')):
-                    with open(file_path, 'r', errors='ignore') as file:
-                        contents = file.read()
-                        if search_text in contents:
-                            results.append(file_path)
-        return results
+def main():
+    # Ensure the directory exists first
+    directory = "C:/path/to/folder"
+    if not os.path.exists(directory):
+        os.makedirs(directory)
 
-    def tag_file(self, file_path, tags):
-        if file_path in self.file_tags:
-            self.file_tags[file_path].update(tags)
-        else:
-            self.file_tags[file_path] = set(tags)
+    # Ask user for file name and extension
+    file_name = input("Enter the file name (without extension): ")
+    file_extension = input(
+        "Enter the file extension (e.g., .txt, .csv, .json): ")
 
-    def search_by_tags(self, tags):
-        results = []
-        for file_path, file_tags in self.file_tags.items():
-            if file_tags.intersection(tags):
-                results.append(file_path)
-        return results
+    # Create the file with the user's inputs
+    created_file = create_file(
+        directory, file_name=file_name, file_extension=file_extension)
+    print(f"File created: {created_file}")
+
+
+# Ensure the main function runs only when the script is executed directly
+if __name__ == "__main__":
+    main()
