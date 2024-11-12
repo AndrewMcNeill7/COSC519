@@ -6,7 +6,7 @@ from tkinter import *
 from tkinter import simpledialog, messagebox
 from tkinter import ttk
 import shutil  # For moving files
-import file_operations  # Assuming file operations are handled as you described
+import file_operations_updated  # Assuming file operations are handled as you described
 
 class FileExplorer(Tk):
     def __init__(self):
@@ -146,7 +146,7 @@ class FileExplorer(Tk):
         if new_file_name:
             try:
                 new_file_path = os.path.join(current_directory, new_file_name)
-                file_operations.rename_file(old_file_path, new_file_path)
+                file_operations_updated.rename_file(old_file_path, new_file_path)
                 messagebox.showinfo("Success", f"File renamed to {new_file_name}")
                 self.update_file_list(current_directory)
             except Exception as e:
@@ -162,7 +162,7 @@ class FileExplorer(Tk):
         confirm = messagebox.askyesno("Confirm Remove", f"Are you sure you want to remove the folder: {folder_path}?")
         if confirm:
             try:
-                file_operations.remove_folder(folder_path)
+                file_operations_updated.remove_folder(folder_path)
                 messagebox.showinfo("Success", f"Folder {folder_path} removed")
                 self.populate_tree()  # Refresh the tree
             except Exception as e:
@@ -174,7 +174,7 @@ class FileExplorer(Tk):
         min_size = simpledialog.askinteger("Min Size (bytes)", "Enter the minimum file size (in bytes):")
         max_size = simpledialog.askinteger("Max Size (bytes)", "Enter the maximum file size (in bytes):")
 
-        results = file_operations.FileManager(directory).search_by_attributes(
+        results = file_operations_updated.FileManager(directory).search_by_attributes(
         file_type=file_type, min_size=min_size, max_size=max_size
     )
         if results:
@@ -188,7 +188,7 @@ class FileExplorer(Tk):
         search_text = simpledialog.askstring("Search Text", "Enter the text to search within files:")
 
         if search_text:
-            results = file_operations.FileManager(directory).search_within_files(search_text)
+            results = file_operations_updated.FileManager(directory).search_within_files(search_text)
             if results:
                 result_text = "\n".join(results)
                 messagebox.showinfo("Search Results", f"Found in:\n{result_text}")
@@ -208,7 +208,7 @@ class FileExplorer(Tk):
         tags = simpledialog.askstring("Tags", "Enter tags separated by commas:")
         if tags:
             tags_list = [tag.strip() for tag in tags.split(',')]
-            file_operations.FileManager(current_directory).tag_file(file_path, tags_list)
+            file_operations_updated.FileManager(current_directory).tag_file(file_path, tags_list)
             messagebox.showinfo("Success", f"Tags added to {file_name}")
 
     def search_by_tags_gui(self):
@@ -217,7 +217,7 @@ class FileExplorer(Tk):
 
         if tags:
             tags_list = set(tag.strip() for tag in tags.split(','))
-            results = file_operations.FileManager(directory).search_by_tags(tags_list)
+            results = file_operations_updated.FileManager(directory).search_by_tags(tags_list)
             if results:
                 result_text = "\n".join(results)
                 messagebox.showinfo("Search Results", f"Files with tags:\n{result_text}")
@@ -256,7 +256,7 @@ class FileExplorer(Tk):
         directory = self.get_full_path(self.tree.focus())  # Get the selected directory path
         folder_name = simpledialog.askstring("Folder Name", "Enter the folder name:")
         if folder_name:
-            folder_path = file_operations.create_folder(directory, folder_name)
+            folder_path = file_operations_updated.create_folder(directory, folder_name)
             messagebox.showinfo("Success", f"Folder created at: {folder_path}")
             self.update_file_list(directory)  # Update the file list to show the new folder
 
@@ -266,9 +266,11 @@ class FileExplorer(Tk):
         if file_name:
             file_extension = simpledialog.askstring("File Extension", "Enter the file extension (e.g., .txt):")
             if file_extension:
-                file_path = file_operations.create_file(directory, file_name, file_extension)
+                full_file_name = file_name + file_extension  # Combine name and extension
+                file_path = file_operations_updated.create_file(directory, full_file_name)  # Pass only the combined name
                 messagebox.showinfo("Success", f"File created at: {file_path}")
                 self.update_file_list(directory)  # Update the file list to show the new file
+
 
     def batch_move_files_gui(self):
         """Handle batch file moving."""
@@ -286,7 +288,7 @@ class FileExplorer(Tk):
                 current_directory = self.get_full_path(self.tree.focus())
                 src_path = os.path.join(current_directory, file_name)
                 try:
-                    file_operations.move_file(src_path, destination)
+                    file_operations_updated.move_file(src_path, destination)
                 except Exception as e:
                     messagebox.showerror("Error", f"Could not move file: {e}")
             
@@ -307,7 +309,7 @@ class FileExplorer(Tk):
                 current_directory = self.get_full_path(self.tree.focus())
                 file_path = os.path.join(current_directory, file_name)
                 try:
-                    file_operations.delete_file(file_path)
+                    file_operations_updated.delete_file(file_path)
                 except Exception as e:
                     messagebox.showerror("Error", f"Could not delete file: {e}")
             
