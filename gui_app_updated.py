@@ -2,6 +2,7 @@
 #to do: 
 
 import os
+import subprocess
 from tkinter import *
 from tkinter import simpledialog, messagebox
 from tkinter import ttk
@@ -249,8 +250,14 @@ class FileExplorer(Tk):
         file_path = os.path.join(current_directory, file_name)
 
         if os.path.isfile(file_path):
-            messagebox.showinfo("File Selected", f"You selected the file: {file_name}")
-            # Add additional actions for opening or editing the file here
+            try:
+                # Open the file with the default program (Windows)
+                os.startfile(file_path)
+                # For macOS or Linux, use:
+                # subprocess.call(['open', file_path])  # For macOS
+                # subprocess.call(['xdg-open', file_path])  # For Linux
+            except Exception as e:
+                messagebox.showerror("Error", f"Could not open file: {e}")
 
     def create_folder_gui(self):
         directory = self.get_full_path(self.tree.focus())  # Get the selected directory path
