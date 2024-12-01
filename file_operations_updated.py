@@ -1,17 +1,22 @@
-#as of 11.12.23 all functions are implemented. 
-#to do: 
+# as of 11.12.23 all functions are implemented.
+# to do:
 import os
 import shutil
 import time
 import fnmatch
 
 # Function to create a folder
+
+
 def create_folder(directory, folder_name="NewFolder"):
     folder_path = os.path.join(directory, folder_name)
-    os.makedirs(folder_path, exist_ok=True)  # Creates the folder if it doesn't exist
+    # Creates the folder if it doesn't exist
+    os.makedirs(folder_path, exist_ok=True)
     return folder_path
 
 # Function to create a file with a dynamic name
+
+
 def create_file(directory, file_name="example.txt"):
     file_path = os.path.join(directory, file_name)
     with open(file_path, 'w') as f:
@@ -19,6 +24,8 @@ def create_file(directory, file_name="example.txt"):
     return file_path
 
 # Function to copy a file
+
+
 def copy_file(src, dst):
     try:
         shutil.copy(src, dst)
@@ -28,6 +35,8 @@ def copy_file(src, dst):
         raise
 
 # Function to delete a file
+
+
 def delete_file(file_path):
     try:
         if os.path.exists(file_path):
@@ -40,6 +49,8 @@ def delete_file(file_path):
         raise
 
 # Function to rename a file
+
+
 def rename_file(old_name, new_name):
     try:
         os.rename(old_name, new_name)
@@ -49,6 +60,8 @@ def rename_file(old_name, new_name):
         raise
 
 # Function to move a file
+
+
 def move_file(src, dst):
     try:
         shutil.move(src, dst)
@@ -58,6 +71,8 @@ def move_file(src, dst):
         raise
 
 # Function to remove a folder
+
+
 def remove_folder(folder_path):
     try:
         shutil.rmtree(folder_path)
@@ -67,6 +82,8 @@ def remove_folder(folder_path):
         raise
 
 # Function to list files in a directory
+
+
 def list_files(directory):
     try:
         return [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
@@ -75,6 +92,8 @@ def list_files(directory):
         raise
 
 # Advanced file operations
+
+
 class FileManager:
     def __init__(self, directory):
         self.directory = directory
@@ -142,3 +161,14 @@ class FileManager:
             if file_tags.intersection(tags):
                 results.append(file_path)
         return results
+
+    def populate_tree(self, path):
+        # Populate the tree with directories
+        self.tree.delete(*self.tree.get_children())
+        for item in os.listdir(path):
+            full_path = os.path.join(path, item)
+            if os.path.isdir(full_path):
+                self.tree.insert('', 'end', text=item, values=(full_path,))
+                node = self.tree.insert(
+                    '', 'end', text=item, values=(full_path,))
+                self.populate_subtree(node, full_path)

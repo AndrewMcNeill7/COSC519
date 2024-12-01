@@ -1,79 +1,15 @@
-#as of 11.12.23 all functions are implemented. 
-#to do: 
-
 import os
-from tkinter import *
-from tkinter import simpledialog, messagebox
-from tkinter import ttk
-import shutil  # For moving files
-import file_operations_updated  # Assuming file operations are handled as you described
+import tkinter as tk
+from tkinter import ttk, messagebox, simpledialog, filedialog
+import subprocess
+import zipfile
+import datetime 
 
-class FileExplorer(Tk):
+class FileExplorer(tk.Tk):
     def __init__(self):
         super().__init__()
 
-        self.title("File Manager")
-        self.geometry("1000x700")  # Larger window size for a cleaner look
-        self.configure(bg='#F5F5F5')  # Lighter background color for a polished look
-
-        # Set the icon for the window (optional)
-        # self.iconbitmap('your_icon.ico')  # Optional: Use your own app icon
-
-        # Main paned window with two panes
-        self.paned_window = PanedWindow(self, orient=HORIZONTAL)
-        self.paned_window.pack(fill=BOTH, expand=True, padx=10, pady=10)
-
-        # Directory Tree (left pane)
-        self.tree_frame = Frame(self.paned_window, bg='#F5F5F5')
-        self.tree = ttk.Treeview(self.tree_frame, selectmode="browse", style="Custom.Treeview")
-        self.tree.pack(fill=BOTH, expand=True)
-        self.tree.bind("<<TreeviewSelect>>", self.on_tree_select)
-
-        # Scrollbar for tree view
-        tree_scroll = Scrollbar(self.tree_frame, orient="vertical", command=self.tree.yview)
-        self.tree.configure(yscrollcommand=tree_scroll.set)
-        tree_scroll.pack(side=RIGHT, fill=Y)
-
-        self.paned_window.add(self.tree_frame, width=250)
-
-        # File List (right pane)
-        self.file_frame = Frame(self.paned_window, bg='#F5F5F5')
-        self.file_list = ttk.Treeview(self.file_frame, columns=("Name", "Size"), show="headings", selectmode="extended", style="Custom.Treeview")
-        self.file_list.heading("Name", text="Name", anchor=W)
-        self.file_list.heading("Size", text="Size (KB)", anchor=W)
-        self.file_list.pack(fill=BOTH, expand=True)
-        self.file_list.bind("<Double-1>", self.on_file_select)  # Bind double-click event
-
-        # Scrollbar for file list
-        file_scroll = Scrollbar(self.file_frame, orient="vertical", command=self.file_list.yview)
-        self.file_list.configure(yscrollcommand=file_scroll.set)
-        file_scroll.pack(side=RIGHT, fill=Y)
-
-        self.paned_window.add(self.file_frame, width=650)
-
-        # Add a frame for the search bar and button
-        self.search_frame = Frame(self, bg='#F5F5F5')
-        self.search_frame.pack(fill=X, pady=10)
-
-        self.search_label = Label(self.search_frame, text="Search Files:")
-        self.search_label.pack(side=LEFT, padx=5)
-
-        self.search_entry = Entry(self.search_frame, width=40)
-        self.search_entry.pack(side=LEFT, padx=5)
-
-        self.search_button = Button(self.search_frame, text="Search", command=self.search_files)
-        self.search_button.pack(side=LEFT, padx=5)
-
-        # Populate the directory tree with initial nodes, starting from the home directory
-        self.populate_tree(path=os.path.expanduser("~"))
-
-        # Button frame at the bottom
-        self.button_frame = Frame(self, bg='#F5F5F5')
-        self.button_frame.pack(fill=X, pady=10)
-
-        self.create_buttons()
-
-        # Styling for Treeview and Button Widgets
+        # Configure styles
         self.style = ttk.Style()
         self.style.configure("Custom.Treeview",
                              background="#EAEAEA",
@@ -81,7 +17,8 @@ class FileExplorer(Tk):
                              rowheight=25,
                              fieldbackground="#F5F5F5",
                              font=("Helvetica", 10))
-        self.style.configure("Custom.Treeview.Heading", font=("Helvetica", 12, 'bold'))
+        self.style.configure("Custom.Treeview.Heading",
+                             font=("Helvetica", 12, 'bold'))
 
         self.style.configure("TButton",
                              font=("Helvetica", 10),
@@ -91,256 +28,360 @@ class FileExplorer(Tk):
                              foreground="#333333")
         self.style.map("TButton", background=[('active', '#45a049')])
 
-    def create_buttons(self):
-        # Use ttk.Button for styling
-        ttk.Button(self.button_frame, text="Create Folder", command=self.create_folder_gui).pack(side=LEFT, padx=10)
-        ttk.Button(self.button_frame, text="Create File", command=self.create_file_gui).pack(side=LEFT, padx=10)
-        ttk.Button(self.button_frame, text="Move Files", command=self.batch_move_files_gui).pack(side=LEFT, padx=10)
-        ttk.Button(self.button_frame, text="Delete Files", command=self.batch_delete_files_gui).pack(side=LEFT, padx=10)
-        ttk.Button(self.button_frame, text="List Files", command=self.list_files_gui).pack(side=LEFT, padx=10)
-        ttk.Button(self.button_frame, text="Rename File", command=self.rename_file_gui).pack(side=LEFT, padx=10)
-        ttk.Button(self.button_frame, text="Remove Folder", command=self.remove_folder_gui).pack(side=LEFT, padx=10)
-        ttk.Button(self.button_frame, text="Search by Attributes", command=self.search_by_attributes_gui).pack(side=LEFT, padx=10)
-        ttk.Button(self.button_frame, text="Search within Files", command=self.search_within_files_gui).pack(side=LEFT, padx=10)
-        ttk.Button(self.button_frame, text="Tag File", command=self.tag_file_gui).pack(side=LEFT, padx=10)
-        ttk.Button(self.button_frame, text="Search by Tags", command=self.search_by_tags_gui).pack(side=LEFT, padx=10)
+        self.title("File Explorer")
+        self.geometry("800x600")
 
-    def populate_tree(self, parent="", path=os.path.expanduser("~")):
-        """Populate the directory tree with folders, starting from the user's home directory."""
+        # Keep track of the current directory
+        self.current_directory = os.path.expanduser("~")
+        self.previous_directories = []
+
+        # Create a paned window
+        self.paned_window = ttk.PanedWindow(self, orient=tk.HORIZONTAL)
+        self.paned_window.pack(fill=tk.BOTH, expand=True)
+
+        # Create the directory tree
+        self.tree_frame = ttk.Frame(self.paned_window)
+        self.paned_window.add(self.tree_frame)
+
+        # Set the initial width of the tree_frame
+        self.tree_frame.pack_propagate(False)
+        self.tree_frame.config(width=250)
+
+        self.tree = ttk.Treeview(self.tree_frame, style="Custom.Treeview")
+        self.tree.pack(fill=tk.BOTH, expand=True)
+
+        # Add a scrollbar for the tree view
+        tree_scroll = ttk.Scrollbar(self.tree_frame, orient="vertical", command=self.tree.yview)
+        self.tree.configure(yscrollcommand=tree_scroll.set)
+        tree_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Create the file list
+        self.file_frame = ttk.Frame(self.paned_window)
+        self.paned_window.add(self.file_frame, weight=1)
+
+        self.file_list = ttk.Treeview(self.file_frame, columns=("Name", "Size", "Last Modified"), show="headings", style="Custom.Treeview")
+        self.file_list.heading("Name", text="File Name", anchor=tk.W)
+        self.file_list.heading("Size", text="Size (KB)", anchor=tk.W)
+        self.file_list.heading("Last Modified", text="Last Modified", anchor=tk.W)
+        self.file_list.pack(fill=tk.BOTH, expand=True)
+
+        # Add a scrollbar for the file list
+        file_scroll = ttk.Scrollbar(self.file_frame, orient="vertical", command=self.file_list.yview)
+        self.file_list.configure(yscrollcommand=file_scroll.set)
+        file_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Create a toolbar with buttons
+        self.toolbar = ttk.Frame(self)
+        self.toolbar.pack(side=tk.TOP, fill=tk.X)
+
+        # Search Entry
+        self.search_entry = ttk.Entry(self.toolbar, font=("Helvetica", 10), width=15)  # Further reduced width and font size
+        self.search_entry.grid(row=0, column=0, padx=5, pady=5, columnspan=2, sticky="ew")
+
+        # Define button properties
+        button_properties = [
+            ("Refresh", self.refresh_file_list),
+            ("New Folder", self.create_new_folder),
+            ("New Text File", self.create_text_file),
+            ("Rename File", self.rename_file_gui),
+            ("Move File", self.move_file_gui),
+            ("Remove Folder", self.remove_folder_gui),
+            ("Delete File", self.delete_file_gui),
+            ("Compress File", self.compress_file_gui),
+            ("Decompress File", self.decompress_file_gui),
+            ("Search", self.search_files),
+        ]
+
+        # Create buttons in two columns
+        for index, (text, command) in enumerate(button_properties):
+            button = ttk.Button(self.toolbar, text=text, command=command, style="TButton")
+            column = index % 2  # Determine column (0 or 1)
+            row = index // 2    # Determine row
+            button.grid(row=row + 1, column=column, padx=5, pady=5, sticky="ew")
+
+        # Configure grid columns to expand
+        self.toolbar.columnconfigure(0, weight=1)
+        self.toolbar.columnconfigure(1, weight=1)
+
+        # Populate the tree with the root directory
+        self.populate_tree(self.current_directory)
+
+        # Bind selection events
+        self.tree.bind("<<TreeviewSelect>>", self.on_tree_select)
+        self.tree.bind("<Double-1>", self.on_tree_expand)
+        self.file_list.bind("<Double-1>", self.on_file_double_click)
+
+    def populate_tree(self, path, parent=""):
+        """Populate the tree with directories and files in the given path."""
         try:
-            for folder in os.listdir(path):
-                full_path = os.path.join(path, folder)
+            for item in os.listdir(path):
+                full_path = os.path.join(path, item)
                 if os.path.isdir(full_path):
-                    node = self.tree.insert(parent, "end", text=folder, open=False)
-                    self.populate_tree(node, full_path)
+                    self.tree.insert(parent, 'end', text=item, values=(full_path,))
+                elif os.path.isfile(full_path):
+                    self.tree.insert(parent, 'end', text=item, values=(full_path,))
         except PermissionError:
-            pass
+            messagebox.showwarning("Access Denied", f"Cannot access directory: {path}")
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+    def on_tree_expand(self, event):
+        """Load directories when a node is expanded."""
+        selected_item = self.tree.focus()
+        path = self.tree.item(selected_item, "values")[0]
+        if not self.tree.get_children(selected_item):
+            self.populate_tree(path, selected_item)
 
     def on_tree_select(self, event):
-        """Handler for directory selection in the tree view."""
+        """Update the file list when a directory is selected."""
         selected_item = self.tree.focus()
-        selected_path = self.get_full_path(selected_item)
+        selected_path = self.tree.item(selected_item, "values")[0]
+        self.previous_directories.append(self.current_directory)
+        self.current_directory = selected_path
+        self.update_file_list(selected_path)
 
-        if os.path.exists(selected_path) and os.path.isdir(selected_path):
-            self.update_file_list(selected_path)
-
-    def get_full_path(self, item):
-        """Get the full path of the selected item in the tree view."""
-        path = []
-        while item:
-            path.insert(0, self.tree.item(item, "text"))
-            item = self.tree.parent(item)
-        return os.path.join(os.path.expanduser("~"), *path)
-    
-    def rename_file_gui(self):
-        selected_item = self.file_list.selection()
-        if not selected_item:
-            messagebox.showwarning("No file selected", "Please select a file to rename.")
-            return
-
-        old_file_name = self.file_list.item(selected_item, "values")[0]
-        current_directory = self.get_full_path(self.tree.focus())
-        old_file_path = os.path.join(current_directory, old_file_name)
-
-        new_file_name = simpledialog.askstring("Rename File", "Enter the new file name:")
-        if new_file_name:
-            try:
-                new_file_path = os.path.join(current_directory, new_file_name)
-                file_operations_updated.rename_file(old_file_path, new_file_path)
-                messagebox.showinfo("Success", f"File renamed to {new_file_name}")
-                self.update_file_list(current_directory)
-            except Exception as e:
-                messagebox.showerror("Error", f"Could not rename file: {e}")
-
-    def remove_folder_gui(self):
-        selected_item = self.tree.focus()
-        if not selected_item:
-            messagebox.showwarning("No folder selected", "Please select a folder to remove.")
-            return
-
-        folder_path = self.get_full_path(selected_item)
-        confirm = messagebox.askyesno("Confirm Remove", f"Are you sure you want to remove the folder: {folder_path}?")
-        if confirm:
-            try:
-                file_operations_updated.remove_folder(folder_path)
-                messagebox.showinfo("Success", f"Folder {folder_path} removed")
-                self.populate_tree()  # Refresh the tree
-            except Exception as e:
-                messagebox.showerror("Error", f"Could not remove folder: {e}")
-
-    def search_by_attributes_gui(self):
-        directory = self.get_full_path(self.tree.focus())
-        file_type = simpledialog.askstring("File Type", "Enter the file type (e.g., txt, csv):")
-        min_size = simpledialog.askinteger("Min Size (bytes)", "Enter the minimum file size (in bytes):")
-        max_size = simpledialog.askinteger("Max Size (bytes)", "Enter the maximum file size (in bytes):")
-
-        results = file_operations_updated.FileManager(directory).search_by_attributes(
-        file_type=file_type, min_size=min_size, max_size=max_size
-    )
-        if results:
-            result_text = "\n".join([f"Path: {r['path']} | Size: {r['size']} bytes" for r in results])
-            messagebox.showinfo("Search Results", f"Found files:\n{result_text}")
-        else:
-            messagebox.showinfo("No Results", "No files matching your criteria were found.")
-
-    def search_within_files_gui(self):
-        directory = self.get_full_path(self.tree.focus())
-        search_text = simpledialog.askstring("Search Text", "Enter the text to search within files:")
-
-        if search_text:
-            results = file_operations_updated.FileManager(directory).search_within_files(search_text)
-            if results:
-                result_text = "\n".join(results)
-                messagebox.showinfo("Search Results", f"Found in:\n{result_text}")
-        else:
-                messagebox.showinfo("No Results", "No files containing the specified text were found.")
-
-    def tag_file_gui(self):
-        selected_item = self.file_list.selection()
-        if not selected_item:
-            messagebox.showwarning("No file selected", "Please select a file to tag.")
-            return
-
+    def on_file_double_click(self, event):
+        """Open the selected file on double click."""
+        selected_item = self.file_list.focus()
         file_name = self.file_list.item(selected_item, "values")[0]
-        current_directory = self.get_full_path(self.tree.focus())
-        file_path = os.path.join(current_directory, file_name)
+        file_path = os.path.join(self.current_directory, file_name)
 
-        tags = simpledialog.askstring("Tags", "Enter tags separated by commas:")
-        if tags:
-            tags_list = [tag.strip() for tag in tags.split(',')]
-            file_operations_updated.FileManager(current_directory).tag_file(file_path, tags_list)
-            messagebox.showinfo("Success", f"Tags added to {file_name}")
-
-    def search_by_tags_gui(self):
-        directory = self.get_full_path(self.tree.focus())
-        tags = simpledialog.askstring("Tags", "Enter tags separated by commas:")
-
-        if tags:
-            tags_list = set(tag.strip() for tag in tags.split(','))
-            results = file_operations_updated.FileManager(directory).search_by_tags(tags_list)
-            if results:
-                result_text = "\n".join(results)
-                messagebox.showinfo("Search Results", f"Files with tags:\n{result_text}")
+        if os.path.isfile(file_path):
+            if file_name.lower().endswith('.txt'):
+                subprocess.run(['notepad', file_path])
             else:
-                messagebox.showinfo("No Results", "No files with matching tags were found.")
-
-
-
+                os.startfile(file_path)
 
     def update_file_list(self, directory):
         """Update the file list based on the selected directory."""
-        for item in self.file_list.get_children():
-            self.file_list.delete(item)
-
+        self.file_list.delete(*self.file_list.get_children())
         try:
             for file_name in os.listdir(directory):
                 file_path = os.path.join(directory, file_name)
                 if os.path.isfile(file_path):
                     size = os.path.getsize(file_path) // 1024  # Size in KB
-                    self.file_list.insert("", "end", values=(file_name, size))
+                    mod_time = os.path.getmtime(file_path)
+                    mod_date = datetime.datetime.fromtimestamp(mod_time).strftime("%m-%d-%Y %I:%M %p")  # 12-hour format
+                    self.file_list.insert("", "end", values=(file_name, size, mod_date))  # Insert file info
         except PermissionError:
             messagebox.showwarning("Access Denied", f"Cannot access directory: {directory}")
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
 
-    def on_file_select(self, event):
-        """Handler for file selection in the file list (double-click event)."""
-        selected_item = self.file_list.focus()
-        file_name = self.file_list.item(selected_item, "values")[0]
-        current_directory = self.get_full_path(self.tree.focus())
-        file_path = os.path.join(current_directory, file_name)
 
-        if os.path.isfile(file_path):
-            messagebox.showinfo("File Selected", f"You selected the file: {file_name}")
-            # Add additional actions for opening or editing the file here
+    def search_files(self, event=None):
+        """Search files by name, extension, or last modified date in the current directory."""
+        search_term = self.search_entry.get().lower()
+        self.file_list.delete(*self.file_list.get_children())
+        
+        try:
+            # Attempt to parse the date if the search term is in the correct format
+            search_date = None
+            if len(search_term) == 10:  # mm-dd-yyyy format
+                try:
+                    search_date = datetime.datetime.strptime(search_term, "%m-%d-%Y").date()
+                except ValueError:
+                    search_date = None  # Invalid date format
 
-    def create_folder_gui(self):
-        directory = self.get_full_path(self.tree.focus())  # Get the selected directory path
-        folder_name = simpledialog.askstring("Folder Name", "Enter the folder name:")
+            for file_name in os.listdir(self.current_directory):
+                file_path = os.path.join(self.current_directory, file_name)
+                is_file = os.path.isfile(file_path)
+
+                if is_file:
+                    # Get file modification date
+                    mod_time = os.path.getmtime(file_path)
+                    mod_date = datetime.datetime.fromtimestamp(mod_time).date()
+
+                    # Check if the search term is in the file name or if it matches the file extension
+                    matches_name_or_extension = (search_term in file_name.lower() or
+                                                (search_term.startswith('.') and file_name.lower().endswith(search_term)))
+
+                    # If a search date was provided, check if it matches the modification date
+                    if (matches_name_or_extension or search_date) and (search_date is None or mod_date == search_date):
+                        size = os.path.getsize(file_path) // 1024  # Size in KB
+                        mod_date_str = datetime.datetime.fromtimestamp(mod_time).strftime("%m-%d-%Y %I:%M %p")  # 12-hour format
+                        self.file_list.insert("", "end", values=(file_name, size, mod_date_str))  # Insert file info
+
+        except PermissionError:
+            messagebox.showwarning("Access Denied", f"Cannot access directory: {self.current_directory}")
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+    def refresh_file_list(self):
+        """Refresh the file list in the current directory."""
+        self.update_file_list(self.current_directory)
+
+    def create_new_folder(self):
+        """Create a new folder in the current directory."""
+        folder_name = simpledialog.askstring("New Folder", "Enter folder name:")
         if folder_name:
-            folder_path = file_operations_updated.create_folder(directory, folder_name)
-            messagebox.showinfo("Success", f"Folder created at: {folder_path}")
-            self.update_file_list(directory)  # Update the file list to show the new folder
+            new_folder_path = os.path.join(self.current_directory, folder_name)
+            try:
+                os.makedirs(new_folder_path)
+                self.refresh_file_list()
+                messagebox.showinfo("Success", f"Folder '{folder_name}' created successfully.")
+            except FileExistsError:
+                messagebox.showwarning("Warning", "Folder already exists.")
+            except Exception as e:
+                messagebox.showerror("Error", str(e))
 
-    def create_file_gui(self):
-        directory = self.get_full_path(self.tree.focus())  # Get the selected directory path
-        file_name = simpledialog.askstring("File Name", "Enter the file name (without extension):")
+    def create_text_file(self):
+        """Create a new text file in the current directory."""
+        file_name = simpledialog.askstring("New Text File", "Enter file name (without .txt):")
         if file_name:
-            file_extension = simpledialog.askstring("File Extension", "Enter the file extension (e.g., .txt):")
-            if file_extension:
-                full_file_name = file_name + file_extension  # Combine name and extension
-                file_path = file_operations_updated.create_file(directory, full_file_name)  # Pass only the combined name
-                messagebox.showinfo("Success", f"File created at: {file_path}")
-                self.update_file_list(directory)  # Update the file list to show the new file
+            file_name = f"{file_name}.txt"
+            new_file_path = os.path.join(self.current_directory, file_name)
+            try:
+                with open(new_file_path, 'w') as new_file:
+                    new_file.write("")
+                self.refresh_file_list()
+            except FileExistsError:
+                messagebox.showwarning("Warning", "File already exists.")
+            except Exception as e:
+                messagebox.showerror("Error", str(e))
 
-
-    def batch_move_files_gui(self):
-        """Handle batch file moving."""
-        # Get selected files in the file list
+    def move_file_gui(self):
+        """Move selected file(s) to a target directory."""
         selected_items = self.file_list.selection()
         if not selected_items:
-            messagebox.showwarning("No files selected", "Please select files to move.")
-            return
-        
-        # Get destination folder from user
-        destination = simpledialog.askstring("Destination", "Enter the destination directory:")
-        if destination:
-            for item in selected_items:
-                file_name = self.file_list.item(item, "values")[0]
-                current_directory = self.get_full_path(self.tree.focus())
-                src_path = os.path.join(current_directory, file_name)
-                try:
-                    file_operations_updated.move_file(src_path, destination)
-                except Exception as e:
-                    messagebox.showerror("Error", f"Could not move file: {e}")
-            
-            messagebox.showinfo("Success", f"Files moved to {destination}")
-            self.update_file_list(current_directory)  # Update the file list
+            move_all = messagebox.askyesno("Move Files", "No files selected. Do you want to move all files?")
+            if move_all:
+                selected_items = self.file_list.get_children()
+            else:
+                messagebox.showwarning("No files selected", "Please select files to move.")
+                return
 
-    def batch_delete_files_gui(self):
-        """Handle batch file deletion."""
+        target_directory = filedialog.askdirectory(title="Select Target Directory")
+        if not target_directory:
+            return
+
+        moved_items = []
+        for selected_item in selected_items:
+            file_name = self.file_list.item(selected_item, "values")[0]
+            source_path = os.path.join(self.current_directory, file_name)
+            destination_path = os.path.join(target_directory, file_name)
+
+            try:
+                os.rename(source_path, destination_path)
+                moved_items.append(file_name)
+                self.file_list.delete(selected_item)
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to move file '{file_name}': {str(e)}")
+                return
+
+        if moved_items:
+            success_message = f"Moved {len(moved_items)} file(s):\n" + \
+                              "\n".join(moved_items) + \
+                              f"\nTo directory: {target_directory}"
+            messagebox.showinfo("Move Successful", success_message)
+
+        self.refresh_file_list()
+
+    def delete_file_gui(self):
+        """Delete selected file(s) after confirmation."""
         selected_items = self.file_list.selection()
         if not selected_items:
             messagebox.showwarning("No files selected", "Please select files to delete.")
             return
 
-        confirm = messagebox.askyesno("Confirm Delete", "Are you sure you want to delete the selected files?")
-        if confirm:
-            for item in selected_items:
-                file_name = self.file_list.item(item, "values")[0]
-                current_directory = self.get_full_path(self.tree.focus())
-                file_path = os.path.join(current_directory, file_name)
+        if messagebox.askyesno("Confirm Deletion", "Are you sure you want to delete the selected file(s)?"):
+            deleted_items = []
+
+            for selected_item in selected_items:
+                file_name = self.file_list.item(selected_item, "values")[0]
+                file_path = os.path.join(self.current_directory, file_name)
+
                 try:
-                    file_operations_updated.delete_file(file_path)
+                    os.remove(file_path)
+                    deleted_items.append(file_name)
+                    self.file_list.delete(selected_item)
                 except Exception as e:
-                    messagebox.showerror("Error", f"Could not delete file: {e}")
-            
-            messagebox.showinfo("Success", "Selected files have been deleted.")
-            self.update_file_list(current_directory)  # Update the file list
+                    messagebox.showerror("Error", f"Failed to delete file '{file_name}': {str(e)}")
+                    return
 
-    def list_files_gui(self):
-        """List all files in the current directory."""
-        selected_item = self.tree.focus()
-        current_directory = self.get_full_path(selected_item)
-        self.update_file_list(current_directory)
+            if deleted_items:
+                success_message = f"Deleted {len(deleted_items)} file(s):\n" + \
+                                  "\n".join(deleted_items)
+                messagebox.showinfo("Deletion Successful", success_message)
 
-    def search_files(self):
-        """Search files based on the search entry."""
-        search_query = self.search_entry.get().lower()
-        if not search_query:
-            messagebox.showwarning("No Query", "Please enter a search query.")
+    def rename_file_gui(self):
+        """Rename selected file(s) after confirmation."""
+        selected_items = self.file_list.selection()
+        if not selected_items:
+            messagebox.showwarning("No files selected", "Please select a file to rename.")
             return
 
-        found_files = []
+        selected_item = selected_items[0]
+        current_file_name = self.file_list.item(selected_item, "values")[0]
+        new_file_name = simpledialog.askstring("Rename File", "Enter new file name:", initialvalue=current_file_name)
+        if new_file_name:
+            if new_file_name != current_file_name:
+                new_file_path = os.path.join(self.current_directory, new_file_name)
+                if os.path.exists(new_file_path):
+                    messagebox.showwarning("Warning", "A file with that name already exists.")
+                    return
+
+                old_file_path = os.path.join(self.current_directory, current_file_name)
+                try:
+                    os.rename(old_file_path, new_file_path)
+                    self.refresh_file_list()
+                    messagebox.showinfo("Rename Successful", f"File renamed to '{new_file_name}'")
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to rename file: {str(e)}")
+
+    def remove_folder_gui(self):
+        """Remove selected folder after confirmation."""
         selected_item = self.tree.focus()
-        current_directory = self.get_full_path(selected_item)
+        if not selected_item:
+            messagebox.showwarning("No folder selected", "Please select a folder to remove.")
+            return
 
-        for file_name in os.listdir(current_directory):
-            if search_query in file_name.lower():
-                found_files.append(file_name)
+        folder_path = self.tree.item(selected_item, "values")[0]
+        if messagebox.askyesno("Confirm Removal", f"Are you sure you want to remove the folder '{os.path.basename(folder_path)}'?"):
+            try:
+                os.rmdir(folder_path)
+                self.tree.delete(selected_item)
+                self.refresh_file_list()
+                messagebox.showinfo("Removal Successful", f"Folder '{os.path.basename(folder_path)}' removed successfully.")
+            except OSError as e:
+                messagebox.showerror("Error", f"Failed to remove folder: {str(e)}")
 
-        if found_files:
-            messagebox.showinfo("Search Results", f"Found files: {', '.join(found_files)}")
-        else:
-            messagebox.showinfo("No Results", "No files matching your query were found.")
+    def compress_file_gui(self):
+        """Compress selected file(s) into a ZIP archive."""
+        selected_items = self.file_list.selection()
+        if not selected_items:
+            messagebox.showwarning("No files selected", "Please select files to compress.")
+            return
+
+        # Prompt for the name of the zip file
+        zip_file_name = simpledialog.askstring("Compress Files", "Enter name for the zip file (without .zip):")
+        if zip_file_name:
+            zip_file_path = os.path.join(self.current_directory, f"{zip_file_name}.zip")
+            try:
+                with zipfile.ZipFile(zip_file_path, 'w') as zipf:
+                    for selected_item in selected_items:
+                        file_name = self.file_list.item(selected_item, "values")[0]
+                        file_path = os.path.join(self.current_directory, file_name)
+                        zipf.write(file_path, arcname=file_name)  # Add file to the ZIP
+                messagebox.showinfo("Compression Successful", f"Files compressed into '{zip_file_path}'")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to compress files: {str(e)}")
+
+    def decompress_file_gui(self):
+        """Decompress a selected ZIP file."""
+        zip_file_path = filedialog.askopenfilename(title="Select ZIP File", filetypes=[("ZIP files", "*.zip")])
+        if not zip_file_path:
+            return
+
+        try:
+            with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
+                zip_ref.extractall(self.current_directory)
+            messagebox.showinfo("Decompression Successful", f"Files extracted to '{self.current_directory}'")
+            self.refresh_file_list()  # Refresh the file list to show the new files
+        except zipfile.BadZipFile:
+            messagebox.showerror("Error", "The selected file is not a valid ZIP file.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to decompress files: {str(e)}")
 
 if __name__ == "__main__":
     app = FileExplorer()
